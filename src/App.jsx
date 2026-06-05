@@ -1,4 +1,13 @@
 import { useState, useEffect, useRef } from "react";
+import {
+  onAuthStateChanged,
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  sendPasswordResetEmail,
+  signOut as firebaseSignOut,
+} from "firebase/auth";
+import { doc, setDoc, getDoc, serverTimestamp } from "firebase/firestore";
+import { auth, db } from "./firebase";
 
 /* ─── DESIGN TOKENS ─────────────────────────────────────────────── */
 const css = `
@@ -384,7 +393,7 @@ function Nav({ page, setPage, cartCount, onCartOpen, onAccountOpen }) {
 /* ─── CART DRAWER ────────────────────────────────────────────────── */
 function CartDrawer({ open, onClose, items, onRemove, onCheckout }) {
   const subtotal = items.reduce((s, i) => s + i.price * i.qty, 0);
-  const shipping = subtotal >= 1250 ? 0 : 100;
+  const shipping = subtotal >= 1250 ? 0 : 149;
   const total = subtotal + shipping;
 
   return (
@@ -496,60 +505,84 @@ function HomePage({ setPage, onAddCart }) {
 
   return (
     <div className="page-enter">
-      {/* ── HERO ─────────────────────────────────────────────────── */}
+      {/* ── HERO CANVAS ─────────────────────────────────────────── */}
       <section data-hero-section style={{
         minHeight: "100vh",
-        background: "linear-gradient(135deg, #EDE6DB 0%, #E4DDD4 45%, #E4DDD4 100%)",
-        display: "flex", alignItems: "center",
-        padding: "120px 48px 80px",
+        background: "#7F2A3C",
+        display: "flex", flexDirection: "column",
+        alignItems: "center", justifyContent: "center",
         position: "relative", overflow: "hidden",
+        paddingTop: "80px",
       }}>
-        {/* Decorative circles */}
-        <div style={{ position: "absolute", top: "-100px", right: "-100px", width: "500px", height: "500px", borderRadius: "50%", background: "radial-gradient(circle, rgba(127,42,60,0.08), transparent 70%)", pointerEvents: "none" }} />
-        <div style={{ position: "absolute", bottom: "-60px", left: "-60px", width: "350px", height: "350px", borderRadius: "50%", background: "radial-gradient(circle, rgba(127,42,60,0.07), transparent 70%)", pointerEvents: "none" }} />
-        {/* Content */}
-        <div style={{ flex: 1, maxWidth: "580px" }}>
-          <h1 style={{ fontFamily: "'Playfair Display', serif", fontSize: "clamp(3rem, 5vw, 5.2rem)", lineHeight: 1.05, color: "#1C1C1C", fontWeight: 500, marginBottom: "20px" }}>
+        {/* Subtle texture overlay */}
+        <div style={{ position: "absolute", inset: 0, background: "radial-gradient(ellipse at 30% 50%, rgba(160,68,90,0.45) 0%, transparent 60%), radial-gradient(ellipse at 75% 20%, rgba(28,28,28,0.3) 0%, transparent 55%)", pointerEvents: "none" }} />
+
+        {/* Photo collage placeholder area */}
+        <div style={{ position: "relative", zIndex: 1, width: "100%", maxWidth: "1100px", padding: "0 48px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px", marginBottom: "40px" }}>
+          {/* Left image placeholder */}
+          <div style={{
+            height: "520px", background: "rgba(237,230,219,0.08)",
+            border: "1.5px dashed rgba(237,230,219,0.25)",
+            display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "16px",
+          }}>
+            <div style={{ fontSize: "2.5rem", opacity: 0.3, color: "#EDE6DB" }}>◆</div>
+            <div style={{ fontSize: "0.68rem", letterSpacing: "0.18em", textTransform: "uppercase", color: "rgba(237,230,219,0.4)", fontFamily: "'DM Sans', sans-serif" }}>Photo · Coming Soon</div>
+          </div>
+          {/* Right image placeholder */}
+          <div style={{
+            height: "520px", background: "rgba(237,230,219,0.05)",
+            border: "1.5px dashed rgba(237,230,219,0.18)",
+            display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "16px",
+          }}>
+            <div style={{ fontSize: "2.5rem", opacity: 0.25, color: "#EDE6DB" }}>◇</div>
+            <div style={{ fontSize: "0.68rem", letterSpacing: "0.18em", textTransform: "uppercase", color: "rgba(237,230,219,0.3)", fontFamily: "'DM Sans', sans-serif" }}>Photo · Coming Soon</div>
+          </div>
+        </div>
+
+        {/* Brand mark at bottom of canvas */}
+        <div style={{ position: "relative", zIndex: 1, textAlign: "center", paddingBottom: "48px" }}>
+          <div style={{ fontSize: "0.65rem", letterSpacing: "0.28em", textTransform: "uppercase", color: "rgba(237,230,219,0.5)", fontFamily: "'DM Sans', sans-serif", marginBottom: "10px" }}>IMPACKT · The Convertible</div>
+          <div style={{ width: "40px", height: "1px", background: "rgba(237,230,219,0.25)", margin: "0 auto" }} />
+        </div>
+      </section>
+
+      {/* ── TAGLINE / CTA ────────────────────────────────────────── */}
+      <section style={{
+        padding: "100px 48px",
+        background: "#EDE6DB",
+        display: "flex", alignItems: "center", gap: "80px",
+      }}>
+        <div style={{ flex: 1 }}>
+          <h1 style={{ fontFamily: "'Playfair Display', serif", fontSize: "clamp(2.8rem, 4.5vw, 5rem)", lineHeight: 1.06, color: "#1C1C1C", fontWeight: 500, marginBottom: "24px" }}>
             One Bag.
             <br /><em style={{ color: "#7F2A3C" }}>Two Styles.</em>
             <br />Endless
             <br />Possibilities.
           </h1>
-
-          <p style={{ fontSize: "1rem", color: "#2A2A2A", lineHeight: 1.85, maxWidth: "440px", marginBottom: "36px", fontWeight: 300 }}>
+          <p style={{ fontSize: "1rem", color: "#2A2A2A", lineHeight: 1.9, maxWidth: "420px", marginBottom: "40px", fontWeight: 300 }}>
             A convertible masterpiece handcrafted by skilled artisans — transitions effortlessly from a chic tote to a structured backpack, made from earth-conscious materials with every purchase empowering underprivileged communities.
           </p>
-
-          <div style={{ display: "flex", gap: "14px", flexWrap: "wrap", marginBottom: "48px" }}>
+          <div style={{ display: "flex", gap: "14px", flexWrap: "wrap", marginBottom: "52px" }}>
             <button data-hero-cta onClick={() => setPage("product")} style={{
-              background: "#1C1C1C", color: "#EDE6DB",
-              border: "none", padding: "16px 36px",
+              background: "#1C1C1C", color: "#EDE6DB", border: "none", padding: "16px 36px",
               fontFamily: "'DM Sans', sans-serif", fontSize: "0.8rem",
-              letterSpacing: "0.14em", textTransform: "uppercase", fontWeight: 600,
-              transition: "all 0.3s",
+              letterSpacing: "0.14em", textTransform: "uppercase", fontWeight: 600, transition: "all 0.3s",
             }}
-              onMouseEnter={e => { e.currentTarget.style.background = "#7F2A3C"; e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.boxShadow = "0 12px 32px rgba(127,42,60,0.3)"; }}
-              onMouseLeave={e => { e.currentTarget.style.background = "#1C1C1C"; e.currentTarget.style.transform = ""; e.currentTarget.style.boxShadow = ""; }}
-            >
-              Shop Now
-            </button>
+              onMouseEnter={e => { e.currentTarget.style.background = "#7F2A3C"; e.currentTarget.style.transform = "translateY(-2px)"; }}
+              onMouseLeave={e => { e.currentTarget.style.background = "#1C1C1C"; e.currentTarget.style.transform = ""; }}
+            >Shop Now</button>
             <button data-hero-cta onClick={() => setPage("story")} style={{
-              background: "transparent", color: "#1C1C1C",
-              border: "1.5px solid #1C1C1C", padding: "16px 36px",
+              background: "transparent", color: "#1C1C1C", border: "1.5px solid #1C1C1C", padding: "16px 36px",
               fontFamily: "'DM Sans', sans-serif", fontSize: "0.8rem",
-              letterSpacing: "0.14em", textTransform: "uppercase", fontWeight: 600,
-              transition: "all 0.3s",
+              letterSpacing: "0.14em", textTransform: "uppercase", fontWeight: 600, transition: "all 0.3s",
             }}
-              onMouseEnter={e => { e.currentTarget.style.background = "#1C1C1C"; e.currentTarget.style.color = "#EDE6DB"; e.currentTarget.style.transform = "translateY(-2px)"; }}
-              onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "#1C1C1C"; e.currentTarget.style.transform = ""; }}
-            >
-              Learn Our Story
-            </button>
+              onMouseEnter={e => { e.currentTarget.style.background = "#1C1C1C"; e.currentTarget.style.color = "#EDE6DB"; }}
+              onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "#1C1C1C"; }}
+            >Learn Our Story</button>
           </div>
-
           {/* Stats */}
-          <div style={{ display: "flex", gap: "32px" }}>
-            {[["20+", "Artisans Supported"], ["70+", "Bags Crafted"], ["100%", "Eco Materials"]].map(([num, label]) => (
+          <div style={{ display: "flex", gap: "36px" }}>
+            {[["20+", "Artisans Supported"], ["40+", "Bags Crafted"], ["100%", "Eco Materials"]].map(([num, label]) => (
               <div key={label}>
                 <div style={{ fontFamily: "'Playfair Display', serif", fontSize: "2rem", color: "#7F2A3C", fontWeight: 500 }}>{num}</div>
                 <div style={{ fontSize: "0.7rem", color: "#5E6472", textTransform: "uppercase", letterSpacing: "0.1em" }}>{label}</div>
@@ -558,114 +591,31 @@ function HomePage({ setPage, onAddCart }) {
           </div>
         </div>
 
-        {/* Bag Illustration */}
-        <div style={{ flex: 1, display: "flex", justifyContent: "center", alignItems: "center", position: "relative" }}>
+        {/* Bag illustration */}
+        <div style={{ flex: 1, display: "flex", justifyContent: "center" }}>
           <div style={{
-            background: "#F2EDE6",
-            boxShadow: "0 40px 100px rgba(28,28,28,0.14), 0 8px 30px rgba(28,28,28,0.08)",
-            padding: "48px 40px",
-            position: "relative", maxWidth: "520px", width: "100%",
+            background: "#F2EDE6", padding: "48px 40px", position: "relative",
+            maxWidth: "480px", width: "100%",
+            boxShadow: "0 40px 100px rgba(28,28,28,0.1)",
           }}>
             <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "4px", background: "linear-gradient(90deg, #7F2A3C, #A0445A, #7F2A3C)" }} />
             <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "center", gap: "24px" }}>
               <div className="float-anim" style={{ textAlign: "center" }}>
-                <ToteBagSVG size={160} />
-                <div style={{ fontSize: "0.68rem", letterSpacing: "0.15em", textTransform: "uppercase", color: "#5E6472", marginTop: "12px", fontWeight: 500 }}>Tote Mode</div>
+                <ToteBagSVG size={150} />
+                <div style={{ fontSize: "0.65rem", letterSpacing: "0.15em", textTransform: "uppercase", color: "#5E6472", marginTop: "12px" }}>Tote Mode</div>
               </div>
-              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "8px", marginBottom: "40px" }}>
-                <div style={{ width: "1px", height: "30px", background: "linear-gradient(to bottom, transparent, #7F2A3C, transparent)" }} />
-                <span style={{ color: "#7F2A3C", fontSize: "1.3rem" }}>⟷</span>
-                <div style={{ width: "1px", height: "30px", background: "linear-gradient(to bottom, transparent, #7F2A3C, transparent)" }} />
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "8px", marginBottom: "36px" }}>
+                <div style={{ width: "1px", height: "28px", background: "linear-gradient(to bottom, transparent, #7F2A3C, transparent)" }} />
+                <span style={{ color: "#7F2A3C", fontSize: "1.2rem" }}>⟷</span>
+                <div style={{ width: "1px", height: "28px", background: "linear-gradient(to bottom, transparent, #7F2A3C, transparent)" }} />
               </div>
               <div className="float-anim" style={{ textAlign: "center", animationDelay: "-2.5s" }}>
-                <BackpackSVG size={160} />
-                <div style={{ fontSize: "0.68rem", letterSpacing: "0.15em", textTransform: "uppercase", color: "#5E6472", marginTop: "12px", fontWeight: 500 }}>Backpack Mode</div>
+                <BackpackSVG size={150} />
+                <div style={{ fontSize: "0.65rem", letterSpacing: "0.15em", textTransform: "uppercase", color: "#5E6472", marginTop: "12px" }}>Backpack Mode</div>
               </div>
             </div>
-            <div style={{ textAlign: "center", marginTop: "24px", paddingTop: "20px", borderTop: "1px solid rgba(127,42,60,0.15)" }}>
-              <span style={{ fontSize: "0.72rem", letterSpacing: "0.1em", color: "#7F2A3C", fontWeight: 600 }}>✦ THE IMPACKT CONVERTIBLE ✦</span>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ── FEATURED PRODUCT ─────────────────────────────────────── */}
-      <section style={{ padding: "100px 48px", background: "#F2EDE6" }}>
-        <div className="reveal" style={{ textAlign: "center", marginBottom: "64px" }}>
-          <span style={{ fontSize: "0.7rem", letterSpacing: "0.2em", textTransform: "uppercase", color: "#7F2A3C", fontWeight: 600 }}>Featured Collection</span>
-          <h2 style={{ fontFamily: "'Playfair Display', serif", fontSize: "clamp(2rem,4vw,3.2rem)", color: "#1C1C1C", marginTop: "12px", fontWeight: 400 }}>
-            The Signature <em>Convertible</em>
-          </h2>
-        </div>
-
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "80px", alignItems: "center" }}>
-          <div className="reveal" style={{
-            background: "linear-gradient(135deg, #E4DDD4, #D8D0C5)",
-            padding: "60px 40px", display: "flex", flexDirection: "column",
-            alignItems: "center", position: "relative",
-          }}>
-            <div style={{ position: "absolute", top: "24px", right: "24px", background: "#7F2A3C", color: "white", padding: "5px 14px", fontSize: "0.68rem", letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 700 }}>Bestseller</div>
-            <BackpackSVG size={220} />
-            <div style={{ display: "flex", gap: "12px", marginTop: "24px" }}>
-              {["Pearl White", "Midnight Black", "Deep Wine", "Steel Grey"].map((color, i) => (
-                <div key={color} style={{
-                  width: "22px", height: "22px", borderRadius: "50%",
-                  border: "2px solid white",
-                  boxShadow: "0 0 0 1.5px #7F2A3C",
-                  background: ["#EDE6DB", "#1C1C1C", "#7F2A3C", "#8A9099"][i],
-                  cursor: "pointer",
-                }} title={color} />
-              ))}
-            </div>
-          </div>
-
-          <div className="reveal reveal-d2">
-            <div style={{ marginBottom: "8px", fontSize: "0.72rem", color: "#7F2A3C", letterSpacing: "0.12em", textTransform: "uppercase", fontWeight: 600 }}>IMPACKT</div>
-            <h3 style={{ fontFamily: "'Playfair Display', serif", fontSize: "2.4rem", fontWeight: 400, lineHeight: 1.15, marginBottom: "12px" }}>
-              The Convertible Tote-Backpack
-            </h3>
-            <div style={{ display: "flex", gap: "4px", marginBottom: "20px" }}>
-              {[1,2,3,4,5].map(s => <StarIcon key={s} filled />)}
-              <span style={{ fontSize: "0.78rem", color: "#5E6472", marginLeft: "8px" }}>4.9 (71 reviews)</span>
-            </div>
-            <p style={{ color: "#2A2A2A", lineHeight: 1.9, fontSize: "0.92rem", fontWeight: 300, marginBottom: "28px" }}>
-              Born from a vision of effortless versatility, this convertible bag moves with your life. Handcrafted with care, every purchase directly supports artisan communities.
-            </p>
-            {["Converts from tote to backpack in seconds", "Premium waterproof canvas", "Padded laptop compartment (up to 15\")", "Ethically made by trained artisans"].map(f => (
-              <div key={f} style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "10px" }}>
-                <span style={{ color: "#7F2A3C", fontSize: "1rem" }}>✓</span>
-                <span style={{ fontSize: "0.86rem", color: "#2A2A2A" }}>{f}</span>
-              </div>
-            ))}
-            <div style={{ display: "flex", alignItems: "baseline", gap: "12px", margin: "28px 0" }}>
-              <span style={{ fontFamily: "'Playfair Display', serif", fontSize: "2.4rem", color: "#1C1C1C" }}>₹1,249</span>
-              <span style={{ fontSize: "1rem", color: "#5E6472", textDecoration: "line-through" }}>₹1,749</span>
-              <span style={{ background: "#7F2A3C", color: "white", padding: "3px 10px", fontSize: "0.7rem", fontWeight: 700 }}>28% OFF</span>
-            </div>
-            <div style={{ display: "flex", gap: "12px" }}>
-              <button onClick={() => onAddCart({ id: 1, name: "The Convertible Tote-Backpack", price: 1249, qty: 1, color: "Deep Wine" })} style={{
-                flex: 1, padding: "15px", background: "#7F2A3C", color: "#EDE6DB",
-                border: "none", fontFamily: "'DM Sans', sans-serif",
-                fontSize: "0.78rem", letterSpacing: "0.12em", textTransform: "uppercase", fontWeight: 600,
-                transition: "all 0.3s",
-              }}
-                onMouseEnter={e => { e.currentTarget.style.background = "#1C1C1C"; e.currentTarget.style.transform = "translateY(-2px)"; }}
-                onMouseLeave={e => { e.currentTarget.style.background = "#7F2A3C"; e.currentTarget.style.transform = ""; }}
-              >
-                Add to Cart
-              </button>
-              <button onClick={() => setPage("product")} style={{
-                padding: "15px 24px",
-                background: "transparent", color: "#7F2A3C",
-                border: "1.5px solid #7F2A3C", fontFamily: "'DM Sans', sans-serif",
-                fontSize: "0.78rem", letterSpacing: "0.12em", textTransform: "uppercase", fontWeight: 600,
-                transition: "all 0.3s",
-              }}
-                onMouseEnter={e => { e.currentTarget.style.background = "#7F2A3C"; e.currentTarget.style.color = "#EDE6DB"; }}
-                onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "#7F2A3C"; }}
-              >
-                View Details
-              </button>
+            <div style={{ textAlign: "center", marginTop: "20px", paddingTop: "18px", borderTop: "1px solid rgba(127,42,60,0.15)" }}>
+              <span style={{ fontSize: "0.7rem", letterSpacing: "0.1em", color: "#7F2A3C", fontWeight: 600 }}>✦ THE IMPACKT CONVERTIBLE ✦</span>
             </div>
           </div>
         </div>
@@ -1180,22 +1130,26 @@ function StoryPage({ setPage }) {
               A year, 47 prototypes, and countless cups of chai later — IMPACKT was born.
             </p>
           </div>
-          <div className="reveal reveal-d2" style={{ position: "relative", paddingLeft: "28px" }}>
-            {/* Continuous vertical line */}
-            <div style={{ position: "absolute", left: "0", top: "8px", bottom: "8px", width: "1px", background: "rgba(127,42,60,0.2)" }} />
+          <div className="reveal reveal-d2" style={{ position: "relative", paddingLeft: "32px" }}>
+            {/* Continuous vertical line — spans full height */}
+            <div style={{ position: "absolute", left: "5px", top: "5px", bottom: "5px", width: "1px", background: "rgba(127,42,60,0.2)" }} />
             {[
               { year: "2024", event: "Created a solution to the daily problem of choosing between comfort and lack of space" },
               { year: "2025 Jan", event: "First prototype created and tested" },
               { year: "2025 Dec", event: "IMPACKT launches with its first handmade bags" },
-              { year: "2026", event: "Collaboration with Nysa Foundation, Delhi — led by founder Kavita Gupta — 20+ artisans supported, 70+ bags created" },
+              { year: "2026", event: "Collaboration with Nysa Foundation, Delhi — led by founder Kavita Gupta — 20+ artisans supported, 40+ bags created" },
             ].map((item, i) => (
-              <div key={item.year} style={{ display: "flex", gap: "20px", alignItems: "flex-start", marginBottom: i < 3 ? "36px" : "0" }}>
-                {/* Dot on the line */}
-                <div style={{ position: "absolute", left: "-5px", width: "11px", height: "11px", borderRadius: "50%", background: "#7F2A3C", marginTop: "3px", flexShrink: 0 }} />
-                <div>
-                  <div style={{ fontFamily: "'Playfair Display', serif", fontSize: "0.95rem", color: "#7F2A3C", fontWeight: 600, marginBottom: "4px", letterSpacing: "0.02em" }}>{item.year}</div>
-                  <div style={{ fontSize: "0.87rem", color: "#2A2A2A", lineHeight: 1.75, fontWeight: 300 }}>{item.event}</div>
-                </div>
+              <div key={item.year} style={{ position: "relative", marginBottom: i < 3 ? "40px" : "0", paddingLeft: "4px" }}>
+                {/* Dot — positioned relative to each row */}
+                <div style={{
+                  position: "absolute", left: "-28px", top: "4px",
+                  width: "11px", height: "11px", borderRadius: "50%",
+                  background: "#7F2A3C", border: "2px solid #EDE6DB",
+                  boxShadow: "0 0 0 1.5px #7F2A3C",
+                  flexShrink: 0,
+                }} />
+                <div style={{ fontFamily: "'Playfair Display', serif", fontSize: "0.95rem", color: "#7F2A3C", fontWeight: 600, marginBottom: "5px", letterSpacing: "0.02em" }}>{item.year}</div>
+                <div style={{ fontSize: "0.87rem", color: "#2A2A2A", lineHeight: 1.8, fontWeight: 300 }}>{item.event}</div>
               </div>
             ))}
           </div>
@@ -1295,7 +1249,7 @@ function NgoPage() {
 
         {/* Stats bar */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: "2px", marginTop: "60px" }}>
-          {[["75+", "People Trained"], ["80+", "Women Employed"], ["70+", "Bags Produced"], ["₹11L+", "Wages Paid"]].map(([num, label]) => (
+          {[["75+", "People Trained"], ["18+", "Women Employed"], ["40+", "Bags Produced"], ["₹11L+", "Wages Paid"]].map(([num, label]) => (
             <div key={label} style={{ background: "rgba(127,42,60,0.06)", padding: "36px 24px", borderTop: "1px solid rgba(127,42,60,0.12)" }}>
               <div style={{ fontFamily: "'Playfair Display', serif", fontSize: "3rem", color: "#7F2A3C", fontWeight: 500 }}>{num}</div>
               <div style={{ fontSize: "0.78rem", color: "#2A2A2A", letterSpacing: "0.08em", marginTop: "6px" }}>{label}</div>
@@ -1432,8 +1386,8 @@ function NgoPage() {
         <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "28px" }}>
           {[
             { icon: "👩‍🏫", num: "75+", label: "People Trained", sub: "Across 3 districts in Delhi NCR" },
-            { icon: "👩", num: "80+", label: "Women Employed", sub: "78% first-time earners in their families" },
-            { icon: "👜", num: "70+", label: "Bags Crafted", sub: "Each traceable to its artisan" },
+            { icon: "👩", num: "18+", label: "Women Employed", sub: "78% first-time earners in their families" },
+            { icon: "👜", num: "40+", label: "Bags Crafted", sub: "Each traceable to its artisan" },
             { icon: "💰", num: "₹11L+", label: "Wages Distributed", sub: "30% above regional market rate" },
             { icon: "🎓", num: "96%", label: "Skill Graduation Rate", sub: "Among enrolled trainees" },
             { icon: "◇", num: "100%", label: "Sustainable Materials", sub: "Ethically sourced & certified" },
@@ -1648,7 +1602,7 @@ function ShippingPage() {
             </div>
             {[
               { title: "Delivery Timeline", body: "All orders are dispatched within 2–3 business days of confirmation. Standard delivery takes 7–10 business days. We currently ship across India only." },
-              { title: "Shipping Charges", body: "Free shipping on all orders above ₹1,250. A flat shipping fee of ₹99 applies to orders below this threshold." },
+              { title: "Shipping Charges", body: "Free shipping on all orders above ₹1,250. A flat shipping fee of ₹149 applies to orders below this threshold." },
               { title: "Order Tracking", body: "Once your order ships, you'll receive a tracking link on your registered email or WhatsApp number. You can also check your order status in your Account." },
               { title: "Packaging", body: "All IMPACKT bags are shipped in recycled kraft packaging — minimal, protective, and kind to the planet." },
               { title: "Delays", body: "During peak periods or adverse weather, delivery may take an additional 2–3 days. We'll notify you proactively via WhatsApp or email." },
@@ -1690,8 +1644,9 @@ function ShippingPage() {
 }
 
 /* ─── ACCOUNT PAGE ───────────────────────────────────────────────── */
-// Module-level store — persists across re-mounts for the lifetime of the page session
-const _users = {};
+// Account is connected to Firebase Auth + Cloud Firestore.
+// Firebase Auth stores email/password securely.
+// Firestore stores profile details in users/{uid}.
 
 // ── Stable sub-components for Account (defined outside to prevent remount on every render) ──
 function AccInp({ label, value, onChange, placeholder, type }) {
@@ -1717,11 +1672,11 @@ function AccPwInp({ label, value, onChange, placeholder, showPw, toggleShow }) {
   );
 }
 
-function AccBtn({ onClick, children, secondary }) {
+function AccBtn({ onClick, children, secondary, disabled }) {
   return (
-    <button onClick={onClick} style={{ width: "100%", background: secondary ? "none" : "#1C1C1C", color: secondary ? "#7F2A3C" : "#EDE6DB", border: secondary ? "1px solid rgba(127,42,60,0.3)" : "none", padding: "14px", fontFamily: "'DM Sans', sans-serif", fontSize: "0.76rem", letterSpacing: "0.14em", textTransform: "uppercase", fontWeight: 700, cursor: "none", transition: "background 0.25s", marginBottom: secondary ? 0 : "12px" }}
-      onMouseEnter={e => { if (!secondary) e.currentTarget.style.background = "#7F2A3C"; }}
-      onMouseLeave={e => { if (!secondary) e.currentTarget.style.background = "#1C1C1C"; }}>
+    <button disabled={disabled} onClick={onClick} style={{ width: "100%", background: secondary ? "none" : "#1C1C1C", color: secondary ? "#7F2A3C" : "#EDE6DB", border: secondary ? "1px solid rgba(127,42,60,0.3)" : "none", padding: "14px", fontFamily: "'DM Sans', sans-serif", fontSize: "0.76rem", letterSpacing: "0.14em", textTransform: "uppercase", fontWeight: 700, cursor: "none", transition: "background 0.25s", marginBottom: secondary ? 0 : "12px", opacity: disabled ? 0.55 : 1 }}
+      onMouseEnter={e => { if (!secondary && !disabled) e.currentTarget.style.background = "#7F2A3C"; }}
+      onMouseLeave={e => { if (!secondary && !disabled) e.currentTarget.style.background = "#1C1C1C"; }}>
       {children}
     </button>
   );
@@ -1745,145 +1700,194 @@ function AccShell({ title, subtitle, children }) {
   );
 }
 
-function AccountPage({ setPage }) {
-  // ── Auth state ──
+function firebaseErrorMessage(error) {
+  const code = error?.code || "";
+  if (code.includes("auth/email-already-in-use")) return "An account with this email already exists. Please sign in instead.";
+  if (code.includes("auth/invalid-email")) return "Please enter a valid email address.";
+  if (code.includes("auth/weak-password")) return "Password should be at least 6 characters.";
+  if (code.includes("auth/invalid-credential")) return "Incorrect email or password.";
+  if (code.includes("auth/user-not-found")) return "No account found with this email. Please create an account.";
+  if (code.includes("auth/wrong-password")) return "Incorrect password. Try again or use Forgot Password.";
+  if (code.includes("auth/too-many-requests")) return "Too many attempts. Please wait a while and try again.";
+  return error?.message || "Something went wrong. Please try again.";
+}
 
+function AccountPage({ setPage }) {
   const [view, setView] = useState("login"); // login | register | forgot | dashboard
   const [user, setUser] = useState(null);
+  const [profile, setProfile] = useState(null);
+  const [initializing, setInitializing] = useState(true);
+  const [loading, setLoading] = useState(false);
   const sessionTimer = useRef(null);
 
-  // ── Login form ──
-  const [login, setLogin] = useState({ id: "", password: "", showPw: false });
-  // ── Register form ──
+  const [login, setLogin] = useState({ email: "", password: "", showPw: false });
   const [reg, setReg] = useState({ firstName: "", lastName: "", phone: "", email: "", password: "", confirmPw: "", showPw: false });
-  // ── Forgot form ──
-  const [forgot, setForgot] = useState({ id: "", step: "input", newPw: "", confirmPw: "", showPw: false });
-  // ── Shared error / success ──
+  const [forgot, setForgot] = useState({ email: "" });
   const [err, setErr] = useState("");
   const [success, setSuccess] = useState("");
 
-  // ── Auto sign-out after 10 minutes ──
-  const startSession = (u) => {
+  const resetSessionTimer = () => {
     clearTimeout(sessionTimer.current);
-    sessionTimer.current = setTimeout(() => {
-      setUser(null);
+    if (!auth.currentUser) return;
+    sessionTimer.current = setTimeout(async () => {
+      await firebaseSignOut(auth);
       setView("login");
-      setLogin({ id: "", password: "", showPw: false });
-      setErr("You were signed out after 10 minutes of inactivity.");
+      setErr("You were signed out after 10 minutes.");
     }, 10 * 60 * 1000);
-    setUser(u);
-    setView("dashboard");
-    setErr(""); setSuccess("");
   };
 
-  useEffect(() => () => clearTimeout(sessionTimer.current), []);
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      clearTimeout(sessionTimer.current);
+      setUser(firebaseUser);
+      setErr("");
+      setSuccess("");
+
+      if (firebaseUser) {
+        try {
+          const snap = await getDoc(doc(db, "users", firebaseUser.uid));
+          const data = snap.exists() ? snap.data() : {};
+          setProfile({
+            uid: firebaseUser.uid,
+            firstName: data.firstName || "Customer",
+            lastName: data.lastName || "",
+            phone: data.phone || "",
+            email: data.email || firebaseUser.email,
+          });
+          setView("dashboard");
+          resetSessionTimer();
+        } catch (error) {
+          setProfile({ uid: firebaseUser.uid, firstName: "Customer", email: firebaseUser.email });
+          setView("dashboard");
+          resetSessionTimer();
+        }
+      } else {
+        setProfile(null);
+        if (view === "dashboard") setView("login");
+      }
+      setInitializing(false);
+    });
+
+    return () => {
+      unsubscribe();
+      clearTimeout(sessionTimer.current);
+    };
+  }, []);
+
+  if (initializing) {
+    return (
+      <AccShell title="Loading" subtitle="Checking your account session">
+        <p style={{ color: "#5E6472", fontSize: "0.85rem", textAlign: "center" }}>Please wait...</p>
+      </AccShell>
+    );
+  }
 
   // ── LOGIN ────────────────────────────────────────────────────────
   if (view === "login") {
-    const handle = () => {
+    const handle = async () => {
       setErr(""); setSuccess("");
-      if (!login.id || !login.password) { setErr("Please fill in both fields."); return; }
-      const key = login.id.trim().toLowerCase();
-      const phoneKey = login.id.trim().replace(/\s/g, "");
-      const found = _users[key] || _users[phoneKey];
-      if (!found) { setErr("No account found with that email or phone. Please create one."); return; }
-      if (found.password !== login.password) { setErr("Incorrect password. Try again or use Forgot Password."); return; }
-      startSession(found);
+      if (!login.email || !login.password) { setErr("Please fill in both fields."); return; }
+      setLoading(true);
+      try {
+        await signInWithEmailAndPassword(auth, login.email.trim().toLowerCase(), login.password);
+        setLogin({ email: "", password: "", showPw: false });
+      } catch (error) {
+        setErr(firebaseErrorMessage(error));
+      } finally {
+        setLoading(false);
+      }
     };
     return (
       <AccShell title="Sign In" subtitle="Track orders and manage your profile">
         <AccErrBox msg={err} /><AccOkBox msg={success} />
-        <AccInp label="Email or Phone Number" value={login.id} onChange={e => setLogin(f => ({ ...f, id: e.target.value }))} placeholder="you@email.com or 98XXXXXXXX" />
+        <AccInp label="Email Address" value={login.email} onChange={e => setLogin(f => ({ ...f, email: e.target.value }))} placeholder="you@email.com" type="email" />
         <AccPwInp label="Password" value={login.password} onChange={e => setLogin(f => ({ ...f, password: e.target.value }))} placeholder="Enter password" showPw={login.showPw} toggleShow={() => setLogin(f => ({ ...f, showPw: !f.showPw }))} />
         <div style={{ textAlign: "right", marginTop: "-10px", marginBottom: "20px" }}>
-          <button onClick={() => { setErr(""); setSuccess(""); setForgot({ id: "", step: "input", newPw: "", confirmPw: "", showPw: false }); setView("forgot"); }} style={{ background: "none", border: "none", color: "#7F2A3C", fontSize: "0.76rem", cursor: "none", fontFamily: "'DM Sans', sans-serif", textDecoration: "underline" }}>Forgot password?</button>
+          <button onClick={() => { setErr(""); setSuccess(""); setForgot({ email: "" }); setView("forgot"); }} style={{ background: "none", border: "none", color: "#7F2A3C", fontSize: "0.76rem", cursor: "none", fontFamily: "'DM Sans', sans-serif", textDecoration: "underline" }}>Forgot password?</button>
         </div>
-        <AccBtn onClick={handle}>Sign In</AccBtn>
-        <AccBtn secondary onClick={() => { setErr(""); setSuccess(""); setReg({ firstName: "", lastName: "", phone: "", email: "", password: "", confirmPw: "", showPw: false }); setView("register"); }}>Create an Account</AccBtn>
+        <AccBtn onClick={handle} disabled={loading}>{loading ? "Signing In..." : "Sign In"}</AccBtn>
+        <AccBtn secondary disabled={loading} onClick={() => { setErr(""); setSuccess(""); setReg({ firstName: "", lastName: "", phone: "", email: "", password: "", confirmPw: "", showPw: false }); setView("register"); }}>Create an Account</AccBtn>
       </AccShell>
     );
   }
 
   // ── REGISTER ─────────────────────────────────────────────────────
   if (view === "register") {
-    const handle = () => {
+    const handle = async () => {
       setErr(""); setSuccess("");
       const { firstName, lastName, phone, email, password, confirmPw } = reg;
+      const cleanPhone = phone.replace(/\s/g, "");
+      const cleanEmail = email.trim().toLowerCase();
       if (!firstName || !lastName || !phone || !email || !password || !confirmPw) { setErr("All fields are required."); return; }
-      if (!/^\d{10}$/.test(phone.replace(/\s/g, ""))) { setErr("Enter a valid 10-digit phone number."); return; }
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { setErr("Enter a valid email address."); return; }
+      if (!/^\d{10}$/.test(cleanPhone)) { setErr("Enter a valid 10-digit phone number."); return; }
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) { setErr("Enter a valid email address."); return; }
       if (password.length < 6) { setErr("Password must be at least 6 characters."); return; }
       if (password !== confirmPw) { setErr("Passwords do not match."); return; }
-      const emailKey = email.trim().toLowerCase();
-      const phoneKey = phone.replace(/\s/g, "");
-      if (_users[emailKey] || _users[phoneKey]) { setErr("An account with this email or phone already exists."); return; }
-      const newUser = { firstName, lastName, phone: phoneKey, email: emailKey, password };
-      _users[emailKey] = newUser;
-      _users[phoneKey] = newUser;
-      setSuccess("Account created! Signing you in…");
-      setTimeout(() => startSession(newUser), 800);
+
+      setLoading(true);
+      try {
+        const userCredential = await createUserWithEmailAndPassword(auth, cleanEmail, password);
+        const firebaseUser = userCredential.user;
+
+        await setDoc(doc(db, "users", firebaseUser.uid), {
+          firstName: firstName.trim(),
+          lastName: lastName.trim(),
+          phone: cleanPhone,
+          email: cleanEmail,
+          createdAt: serverTimestamp(),
+        });
+
+        setReg({ firstName: "", lastName: "", phone: "", email: "", password: "", confirmPw: "", showPw: false });
+        setSuccess("Account created successfully.");
+      } catch (error) {
+        setErr(firebaseErrorMessage(error));
+      } finally {
+        setLoading(false);
+      }
     };
+
     return (
-      <AccShell title="Create Account" subtitle="Join IMPACKT — it only takes a moment">
+      <AccShell title="Create Account" subtitle="Join IMPACKT and save your details securely">
         <AccErrBox msg={err} /><AccOkBox msg={success} />
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
-          <AccInp label="First Name" value={reg.firstName} onChange={e => setReg(f => ({ ...f, firstName: e.target.value }))} placeholder="Adya" />
-          <AccInp label="Last Name" value={reg.lastName} onChange={e => setReg(f => ({ ...f, lastName: e.target.value }))} placeholder="Gupta" />
+          <AccInp label="First Name" value={reg.firstName} onChange={e => setReg(f => ({ ...f, firstName: e.target.value }))} placeholder="First" />
+          <AccInp label="Last Name" value={reg.lastName} onChange={e => setReg(f => ({ ...f, lastName: e.target.value }))} placeholder="Last" />
         </div>
-        <AccInp label="Phone Number" value={reg.phone} onChange={e => setReg(f => ({ ...f, phone: e.target.value }))} placeholder="98XXXXXXXX" />
-        <AccInp label="Email Address" value={reg.email} onChange={e => setReg(f => ({ ...f, email: e.target.value }))} placeholder="you@email.com" />
-        <AccPwInp label="Create Password" value={reg.password} onChange={e => setReg(f => ({ ...f, password: e.target.value }))} placeholder="Min. 6 characters" showPw={reg.showPw} toggleShow={() => setReg(f => ({ ...f, showPw: !f.showPw }))} />
+        <AccInp label="Phone Number" value={reg.phone} onChange={e => setReg(f => ({ ...f, phone: e.target.value }))} placeholder="98XXXXXXXX" type="tel" />
+        <AccInp label="Email Address" value={reg.email} onChange={e => setReg(f => ({ ...f, email: e.target.value }))} placeholder="you@email.com" type="email" />
+        <AccPwInp label="Password" value={reg.password} onChange={e => setReg(f => ({ ...f, password: e.target.value }))} placeholder="At least 6 characters" showPw={reg.showPw} toggleShow={() => setReg(f => ({ ...f, showPw: !f.showPw }))} />
         <AccPwInp label="Confirm Password" value={reg.confirmPw} onChange={e => setReg(f => ({ ...f, confirmPw: e.target.value }))} placeholder="Re-enter password" showPw={reg.showPw} toggleShow={() => setReg(f => ({ ...f, showPw: !f.showPw }))} />
-        <AccBtn onClick={handle}>Create Account</AccBtn>
-        <div style={{ textAlign: "center", marginTop: "6px" }}>
-          <button onClick={() => { setErr(""); setSuccess(""); setView("login"); }} style={{ background: "none", border: "none", color: "#5E6472", fontSize: "0.76rem", cursor: "none", fontFamily: "'DM Sans', sans-serif" }}>Already have an account? <span style={{ color: "#7F2A3C", fontWeight: 600 }}>Sign In</span></button>
-        </div>
+        <AccBtn onClick={handle} disabled={loading}>{loading ? "Creating..." : "Create Account"}</AccBtn>
+        <AccBtn secondary disabled={loading} onClick={() => { setErr(""); setSuccess(""); setView("login"); }}>Already have an account? Sign In</AccBtn>
       </AccShell>
     );
   }
 
-  // ── FORGOT PASSWORD ───────────────────────────────────────────────
+  // ── FORGOT PASSWORD ──────────────────────────────────────────────
   if (view === "forgot") {
-    const handleFind = () => {
+    const handleReset = async () => {
       setErr(""); setSuccess("");
-      if (!forgot.id) { setErr("Please enter your email or phone number."); return; }
-      const key = forgot.id.trim().toLowerCase();
-      const found = _users[key] || _users[forgot.id.replace(/\s/g, "")];
-      if (!found) { setErr("No account found with that email or phone."); return; }
-      setForgot(f => ({ ...f, step: "reset" }));
-      setSuccess("Account found. Please set your new password.");
-    };
-    const handleReset = () => {
-      setErr(""); setSuccess("");
-      if (!forgot.newPw || !forgot.confirmPw) { setErr("Please fill in both password fields."); return; }
-      if (forgot.newPw.length < 6) { setErr("Password must be at least 6 characters."); return; }
-      if (forgot.newPw !== forgot.confirmPw) { setErr("Passwords do not match."); return; }
-      const key = forgot.id.trim().toLowerCase();
-      const phoneKey = forgot.id.replace(/\s/g, "");
-      const found = _users[key] || _users[phoneKey];
-      if (found) {
-        found.password = forgot.newPw;
-        // update all keys pointing to this user
-        Object.keys(_users).forEach(k => { if (_users[k] === found) _users[k].password = forgot.newPw; });
+      const cleanEmail = forgot.email.trim().toLowerCase();
+      if (!cleanEmail) { setErr("Please enter your registered email address."); return; }
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) { setErr("Enter a valid email address."); return; }
+
+      setLoading(true);
+      try {
+        await sendPasswordResetEmail(auth, cleanEmail);
+        setSuccess("Password reset email sent. Please check your inbox.");
+        setForgot({ email: "" });
+      } catch (error) {
+        setErr(firebaseErrorMessage(error));
+      } finally {
+        setLoading(false);
       }
-      setSuccess("Password updated! You can now sign in.");
-      setTimeout(() => { setView("login"); setSuccess("Password updated — please sign in."); }, 1200);
     };
+
     return (
-      <AccShell title="Reset Password" subtitle={forgot.step === "input" ? "Enter your registered email or phone" : "Set a new password for your account"}>
+      <AccShell title="Reset Password" subtitle="We'll send a reset link to your registered email">
         <AccErrBox msg={err} /><AccOkBox msg={success} />
-        {forgot.step === "input" ? (
-          <>
-            <AccInp label="Email or Phone Number" value={forgot.id} onChange={e => setForgot(f => ({ ...f, id: e.target.value }))} placeholder="you@email.com or 98XXXXXXXX" />
-            <AccBtn onClick={handleFind}>Find My Account</AccBtn>
-          </>
-        ) : (
-          <>
-            <AccPwInp label="New Password" value={forgot.newPw} onChange={e => setForgot(f => ({ ...f, newPw: e.target.value }))} placeholder="Min. 6 characters" showPw={forgot.showPw} toggleShow={() => setForgot(f => ({ ...f, showPw: !f.showPw }))} />
-            <AccPwInp label="Confirm New Password" value={forgot.confirmPw} onChange={e => setForgot(f => ({ ...f, confirmPw: e.target.value }))} placeholder="Re-enter new password" showPw={forgot.showPw} toggleShow={() => setForgot(f => ({ ...f, showPw: !f.showPw }))} />
-            <AccBtn onClick={handleReset}>Reset Password</AccBtn>
-          </>
-        )}
+        <AccInp label="Registered Email Address" value={forgot.email} onChange={e => setForgot(f => ({ ...f, email: e.target.value }))} placeholder="you@email.com" type="email" />
+        <AccBtn onClick={handleReset} disabled={loading}>{loading ? "Sending..." : "Send Reset Email"}</AccBtn>
         <div style={{ textAlign: "center", marginTop: "6px" }}>
           <button onClick={() => { setErr(""); setSuccess(""); setView("login"); }} style={{ background: "none", border: "none", color: "#5E6472", fontSize: "0.76rem", cursor: "none", fontFamily: "'DM Sans', sans-serif" }}>← Back to Sign In</button>
         </div>
@@ -1892,21 +1896,24 @@ function AccountPage({ setPage }) {
   }
 
   // ── DASHBOARD ─────────────────────────────────────────────────────
-  const signOut = () => {
+  const signOut = async () => {
     clearTimeout(sessionTimer.current);
-    setUser(null); setView("login");
-    setLogin({ id: "", password: "", showPw: false });
+    await firebaseSignOut(auth);
+    setLogin({ email: "", password: "", showPw: false });
     setErr(""); setSuccess("");
+    setView("login");
   };
+
+  const shownProfile = profile || { firstName: "Customer", email: user?.email || "" };
 
   return (
     <div style={{ minHeight: "100vh", background: "#EDE6DB", paddingTop: "100px" }}>
       <div style={{ background: "#1C1C1C", padding: "60px 48px 48px", textAlign: "center" }}>
         <span style={{ fontSize: "0.7rem", letterSpacing: "0.2em", textTransform: "uppercase", color: "#7F2A3C", fontWeight: 600 }}>My Account</span>
         <h1 style={{ fontFamily: "'Playfair Display', serif", fontSize: "2.4rem", color: "#EDE6DB", fontWeight: 400, margin: "12px 0 4px" }}>
-          Welcome, {user.firstName}
+          Welcome, {shownProfile.firstName}
         </h1>
-        <p style={{ color: "rgba(237,230,219,0.5)", fontSize: "0.82rem" }}>{user.email}</p>
+        <p style={{ color: "rgba(237,230,219,0.5)", fontSize: "0.82rem" }}>{shownProfile.email}</p>
       </div>
       <div style={{ maxWidth: "800px", margin: "0 auto", padding: "56px 48px" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "32px" }}>
